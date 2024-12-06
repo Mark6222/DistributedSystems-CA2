@@ -31,6 +31,7 @@ export const handler: SQSHandler = async (event: any) => {
       for (const messageRecord of snsMessage.Records) {
         const s3e = messageRecord.s3;
         const srcBucket = s3e.bucket.name;
+        const eventName = messageRecord.eventName
         // Object key may have spaces or unicode non-ASCII characters.
         const srcKey = decodeURIComponent(s3e.object.key.replace(/\+/g, " "));
         const fileType = srcKey.split(".").pop()?.toLowerCase();
@@ -40,6 +41,9 @@ export const handler: SQSHandler = async (event: any) => {
           if (!fileTypes.includes(`.${fileType}`)) {
             console.log(`Invalid file type: ${fileType}`);
             throw new Error(`Unsupported file type: ${fileType}`);
+          }
+          if (eventName.startsWith("ObjectRemoved")) {
+            return;
           }
           const { name, email, message }: ContactDetails = {
             name: "The Photo Album",

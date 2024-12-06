@@ -34,6 +34,7 @@ export class EDAAppStack extends cdk.Stack {
       partitionKey: { name: "fileName", type: dynamodb.AttributeType.STRING },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       tableName: "Images",
+      stream: StreamViewType.NEW_IMAGE,
     });
 
     const deadLetterQueue = new sqs.Queue(this, "DeadLetterQueue", {
@@ -108,6 +109,10 @@ export class EDAAppStack extends cdk.Stack {
       new s3n.SnsDestination(newImageTopic)
     );
 
+    imagesBucket.addEventNotification(
+      s3.EventType.OBJECT_REMOVED,
+      new s3n.SnsDestination(newImageTopic)
+    );
     // SQS --> Lambda
     const newImageEventSource = new events.SqsEventSource(imageProcessQueue, {
       batchSize: 5,
@@ -126,13 +131,15 @@ export class EDAAppStack extends cdk.Stack {
       maxBatchingWindow: cdk.Duration.seconds(5),
     });
 
+
     newImageTopic.addSubscription(
       new subs.SqsSubscription(imageProcessQueue)
     );
 
-    newImageTopic.addSubscription(new subs.SqsSubscription(mailerQ));
+    newImageTopic.addSubscription(
+      new subs.SqsSubscription(mailerQ)
+    );
     newImageTopic.addSubscription(new subs.SqsSubscription(deadLetterQueue));
-
     newImageTopic.addSubscription(
       new subs.SqsSubscription(updateImageQueue, {
         rawMessageDelivery: true,
@@ -143,11 +150,11 @@ export class EDAAppStack extends cdk.Stack {
         },
       })
     );
+
     processImageFn.addEventSource(newImageEventSource);
     mailerFn.addEventSource(newImageMailEventSource);
     failedImageFn.addEventSource(failedImageMailEventSource);
     updateImageFn.addEventSource(imageUpdateEventSource);
-
     // Permissions
 
     imagesBucket.grantRead(processImageFn);
@@ -168,7 +175,7 @@ export class EDAAppStack extends cdk.Stack {
 
     processImageFn.addToRolePolicy(
       new iam.PolicyStatement({
-        actions: ['dynamodb:PutItem'],
+        actions: ['dynamodb:PutItem', 'dynamodb:DeleteItem'],
         resources: [imagesTable.tableArn],
       })
     );

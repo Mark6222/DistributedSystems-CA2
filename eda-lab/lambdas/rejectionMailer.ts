@@ -36,7 +36,12 @@ export const handler: SQSHandler = async (event) => {
 
                 const srcKey = decodeURIComponent(s3e.object.key.replace(/\+/g, " "));
                 const fileType = srcKey.split(".").pop()?.toLowerCase();
+                const fileTypes = [".png", ".jpeg"];
                 try {
+                    if (fileTypes.includes(`.${fileType}`)) {
+                        console.log(`Valid file type: ${fileType}`);
+                        throw new Error(`Valid file type: ${fileType}`);
+                    }
                     const { name, email, message }: ContactDetails = {
                         name: "The Photo Album",
                         email: SES_EMAIL_FROM,
